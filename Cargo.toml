@@ -1,0 +1,6 @@
+[package]
+name = "super_parser"
+version = "0.1.0"
+authors = ["Paluth <hallofdreams@yahoo.com.br>"]
+
+[dependencies]
