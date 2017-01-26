@@ -1,3 +1,7 @@
+use parser::{Parser, seq, take, skip};
+use chain::{trimr, triml, trim, empty, to_i32, to_u8, to_byte, to_f64, opt, store};
+use inspect;
+
 // PDB File ATOM line format
 //
 // COLUMNS        DATA  TYPE    FIELD        DEFINITION
@@ -53,5 +57,40 @@ impl ATOM {
             element: String::with_capacity(2),
             charge: String::with_capacity(2),
         }
+    }
+
+    pub fn parse(&mut self, buffer: &str) -> bool {
+        let mut parser = self.create_parser();
+
+        inspect::print(&parser);
+        let result = parser.parse(buffer);
+
+        match result {
+            Ok(_) => {
+                println!("Parser succeeded!");
+                true
+            }
+            Err(e) => {
+                println!("Parser failed: {:?}", e);
+                false
+            }
+        }
+    }
+
+    fn create_parser(&mut self) -> Parser {
+        seq(vec![    
+            take(6).chain(trimr().eq_str("ATOM")),
+            take(5).chain(trim().to_i32().store(&mut self.serial)),
+            skip(1),
+            take(4).chain(trim().store(&mut self.name)),
+            take(1).chain(opt(to_u8().store(&mut self.alt_loc))),
+            take(3).chain(store(&mut self.res_name)),
+            skip(1),
+            take(1).chain(to_byte().store(&mut self.icode)),
+            skip(8),
+            take(8).chain(trim().to_f64().store(&mut self.x)),
+            take(8).chain(trim().to_f64().store(&mut self.y)),
+            take(8).chain(trim().to_f64().store(&mut self.z)),
+        ])
     }
 }
