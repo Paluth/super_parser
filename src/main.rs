@@ -3,7 +3,7 @@ mod parser;
 mod utils;
 mod pdb_parser;
 mod inspect;
-
+use utils::until;
 use parser::{seq, take, skip};
 use pdb_parser::ATOM;
 use chain::{trimr, triml, trim, empty, to_i32, to_u8, to_byte, to_f64, opt, store};
@@ -25,6 +25,30 @@ fn parse_pdb() {
     println!("Z {}", atom.z);
 }
 
+fn parse_darxml() {
+    let dml = 
+"def use core {{
+    extern crate glutin;
+    extern crate gleam;
+
+    use gleam::gl;
+}}
+
+def block main {{
+    open {{
+        fn main() {
+    }}
+    close  {{
+        }
+    }}
+}}
+
+use core
+main {}";
+
+}
+
 fn main() {
     parse_pdb();
+    println!("{}", until(&"abcdefg", &[&"j", &"k", &"w"]));
 }

@@ -10,7 +10,7 @@ pub enum Skip<'s> {
     Rest(&'s str),
 }
 
-#[inline(always)]
+#[inline]
 pub fn take(buffer: &str, count : usize) -> Take {
     if buffer.len() < count {
         return Take::InsufficientBuffer;
@@ -20,7 +20,7 @@ pub fn take(buffer: &str, count : usize) -> Take {
     Take::Split(&buffer[..count], &buffer[count..])
 }
 
-#[inline(always)]
+#[inline]
 pub fn skip(buffer: &str, count : usize) -> Skip {
     if buffer.len() < count {
         return Skip::InsufficientBuffer;
@@ -30,12 +30,45 @@ pub fn skip(buffer: &str, count : usize) -> Skip {
     Skip::Rest(&buffer[count..])
 }
 
-#[inline(always)]
-pub fn is_whitespace(chr: char) -> bool {
-    chr == ' ' || chr == '\t' || chr == '\r' || chr == '\n'
+// Stolen from NOM
+/// Tests if byte is ASCII alphabetic: A-Z, a-z
+#[inline]
+pub fn is_alphabetic(chr:u8) -> bool {
+  (chr >= 0x41 && chr <= 0x5A) || (chr >= 0x61 && chr <= 0x7A)
 }
 
-#[inline(always)]
+// Stolen from NOM
+/// Tests if byte is ASCII digit: 0-9
+#[inline]
+pub fn is_digit(chr: u8) -> bool {
+  chr >= 0x30 && chr <= 0x39
+}
+
+#[inline]
+pub fn is_blank(chr: char) -> bool {
+    chr == ' ' || chr == '\t' || chr == '\r' || chr == '\n'
+}
+/// Takes bytes until the end of the buffer or until an 'ending' is found
+pub fn until<'a, 'b>(buffer: &'a str, ending: &[&'b str]) -> &'a str {
+    let mut result = &buffer[0..0];
+    let mut temp = buffer;
+    loop {
+        for end in ending {
+            if temp.starts_with(end) {
+                return result;
+            }
+        }
+        if temp.len() >= 1 {
+            temp = &temp[1..];
+            result = &buffer[0..result.len() + 1];
+        } else {
+            break;
+        }
+    }
+    result
+}
+
+#[inline]
 pub fn trim(buffer: &str) -> &str {
     triml(trimr(buffer))
 }
@@ -46,7 +79,7 @@ pub fn trimr(buffer: &str) -> &str {
     let mut rchars = buffer.chars().rev();
 
     while let Some(c) = rchars.next() {
-        if !is_whitespace(c) {
+        if !is_blank(c) {
             break;
         }
         count_ws += 1;
@@ -60,7 +93,7 @@ pub fn triml(buffer: &str) -> &str {
     let mut rchars = buffer.chars();
 
     while let Some(c) = rchars.next() {
-        if !is_whitespace(c) {
+        if !is_blank(c) {
             break;
         }
         count_ws += 1;
