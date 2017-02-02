@@ -3,6 +3,7 @@ use chain::{Chain, Operation};
 use utils;
 
 pub enum ParserType<'d, 'a> {
+    /// Stores a Sequence of parsers. Executes until all pass or one failure occurs.
     Sequence(Vec<Parser<'d, 'a>>),
     Take(usize),
     Skip(usize),

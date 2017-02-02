@@ -3,6 +3,7 @@ pub enum Error {
     InsufficientBuffer,
     InvalidCharBoundary,
     EmptyBuffer,
+    TagNotEqual,
     InvalidPWord,
     TrimingError,
 }
@@ -16,6 +17,16 @@ pub struct Split<'s> {
 impl<'s> Split<'s> {
     pub fn new(left: &'s str, right: &'s str) -> Split<'s> {
         Split { left: left, right: right }
+    }
+}
+
+pub fn tag<'b, 'v>(buffer: &'b str, value: &'v str) -> Result<Split<'b>, Error> {
+    let rtake = take(buffer, value.len());
+
+    match rtake {
+        Err(e) => Err(e),
+        Ok(Split {left, right}) if left == value => Ok(Split::new(left, right)),
+        Ok(_) => Err(Error::TagNotEqual),
     }
 }
 

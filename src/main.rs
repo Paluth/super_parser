@@ -3,7 +3,7 @@ mod parser;
 mod utils;
 mod pdb_parser;
 mod inspect;
-use utils::{until, pword};
+use utils::{until, pword, tag};
 use parser::{seq, take, skip};
 use pdb_parser::ATOM;
 use chain::{trimr, triml, trim, empty, to_i32, to_u8, to_byte, to_f64, opt, store};
@@ -60,4 +60,6 @@ fn main() {
     println!("{:?}", until(&"abcdefg", &[&"j", &"w"]));
     println!("------------ Test PWord ------------");
     println!("word {:?}", pword(&"d_7_ te2_243 st test"));
+    println!("------------ Test Tag ------------");
+    println!("tag {:?}", tag(&"d_7_ te2_243 st test", "d_7_ te2_243 st test"));
 }
