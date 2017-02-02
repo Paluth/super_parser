@@ -1,33 +1,42 @@
-pub enum Take<'t> {
+#[derive(Debug)]
+pub enum Error {
     InsufficientBuffer,
     InvalidCharBoundary,
-    Split(&'t str, &'t str)
+    EmptyBuffer,
+    InvalidPWord,
+    TrimingError,
 }
 
-pub enum Skip<'s> {
-    InsufficientBuffer,
-    InvalidCharBoundary,
-    Rest(&'s str),
+#[derive(Debug)]
+pub struct Split<'s> {
+    pub left: &'s str,
+    pub right: &'s str,
+}
+
+impl<'s> Split<'s> {
+    pub fn new(left: &'s str, right: &'s str) -> Split<'s> {
+        Split { left: left, right: right }
+    }
 }
 
 #[inline]
-pub fn take(buffer: &str, count : usize) -> Take {
+pub fn take(buffer: &str, count : usize) -> Result<Split, Error> {
     if buffer.len() < count {
-        return Take::InsufficientBuffer;
+        return Err(Error::InsufficientBuffer);
     } else if !buffer.is_char_boundary(count) {
-        return Take::InvalidCharBoundary;
+        return Err(Error::InvalidCharBoundary);
     }
-    Take::Split(&buffer[..count], &buffer[count..])
+    Ok(Split::new(&buffer[..count], &buffer[count..]))
 }
 
 #[inline]
-pub fn skip(buffer: &str, count : usize) -> Skip {
+pub fn skip(buffer: &str, count : usize) -> Result<Split, Error> {
     if buffer.len() < count {
-        return Skip::InsufficientBuffer;
+        return Err(Error::InsufficientBuffer);
     } else if !buffer.is_char_boundary(count) {
-        return Skip::InvalidCharBoundary;
+        return Err(Error::InvalidCharBoundary);
     }
-    Skip::Rest(&buffer[count..])
+    Ok(Split::new(&buffer[..count], &buffer[count..]))
 }
 
 // Stolen from NOM
@@ -48,33 +57,75 @@ pub fn is_digit(chr: u8) -> bool {
 pub fn is_blank(chr: char) -> bool {
     chr == ' ' || chr == '\t' || chr == '\r' || chr == '\n'
 }
+
+/// Captures characters until a no pword char is found
+/// Note pword starts with A-Z or a-z or '_' and can have A-Z, a-z, '_'
+/// and 0-9 after the first char
+pub fn pword<'w>(buffer: &'w str) -> Result<Split, Error> {
+    let bytes = buffer.as_bytes();
+    let mut i : usize = 0;
+
+    // first char must be alpha or '_'
+    if bytes.len() == 0 {
+        return Err(Error::EmptyBuffer);
+    } else if !is_alphabetic(bytes[0]) && bytes[i] != b'_' {
+        return Err(Error::InvalidPWord);
+    } else {
+        i += 1;
+    }
+
+    loop {
+        if i > bytes.len() {
+            return Ok(Split::new(&buffer[0..i], &buffer[i..]));
+        }
+                
+        if !is_digit(bytes[i]) && !is_alphabetic(bytes[i]) && bytes[i] != b'_' {
+            return Ok(Split::new(&buffer[0..i], &buffer[i..]));
+        } else {
+            i += 1;
+        }
+    }
+}
+/// Takes bytes while blank (space, tab, \n \r)
+pub fn blank<'a, 'b>(buffer: &'a str) -> Result<Split, Error> {
+    triml(buffer)
+}
 /// Takes bytes until the end of the buffer or until an 'ending' is found
-pub fn until<'a, 'b>(buffer: &'a str, ending: &[&'b str]) -> &'a str {
-    let mut result = &buffer[0..0];
+/// Result does not include ending
+pub fn until<'a, 'b>(buffer: &'a str, ending: &[&'b str]) -> Result<Split<'a>, Error> {
+    let mut i = 0;
     let mut temp = buffer;
     loop {
         for end in ending {
+            let temp = &buffer[i..];
             if temp.starts_with(end) {
-                return result;
+                return Ok(Split::new(&buffer[0..i], &buffer[i..]));
             }
         }
-        if temp.len() >= 1 {
-            temp = &temp[1..];
-            result = &buffer[0..result.len() + 1];
+        if i < temp.len() {
+            i += 1;
         } else {
             break;
         }
     }
-    result
+    return Ok(Split::new(&buffer[..], &buffer[i..]));
 }
 
 #[inline]
-pub fn trim(buffer: &str) -> &str {
-    triml(trimr(buffer))
+pub fn trim(buffer: &str) -> Result<&str, Error> {
+    let result = triml(buffer);
+
+    if let Ok(Split { left, right }) = result {
+        let result = trimr(right);
+        if let Ok(Split { left, right }) = result {
+            return Ok(left);
+        }
+    }
+    Err(Error::TrimingError)
 }
 
 #[inline]
-pub fn trimr(buffer: &str) -> &str {
+pub fn trimr(buffer: &str) -> Result<Split, Error> {
     let mut count_ws = 0;
     let mut rchars = buffer.chars().rev();
 
@@ -84,11 +135,12 @@ pub fn trimr(buffer: &str) -> &str {
         }
         count_ws += 1;
     }
-    &buffer[..buffer.len() - count_ws]
+    let result_count = buffer.len() - count_ws;
+    Ok(Split::new(&buffer[..result_count], &buffer[result_count..]))
 }
 
 #[inline]
-pub fn triml(buffer: &str) -> &str {
+pub fn triml(buffer: &str) -> Result<Split, Error> {
     let mut count_ws = 0;
     let mut rchars = buffer.chars();
 
@@ -98,7 +150,7 @@ pub fn triml(buffer: &str) -> &str {
         }
         count_ws += 1;
     }
-    &buffer[count_ws..]
+    Ok(Split::new(&buffer[0..count_ws], &buffer[count_ws..]))
 }
 
 #[cfg(test)]

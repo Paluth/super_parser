@@ -3,7 +3,7 @@ mod parser;
 mod utils;
 mod pdb_parser;
 mod inspect;
-use utils::until;
+use utils::{until, pword};
 use parser::{seq, take, skip};
 use pdb_parser::ATOM;
 use chain::{trimr, triml, trim, empty, to_i32, to_u8, to_byte, to_f64, opt, store};
@@ -49,6 +49,15 @@ main {}";
 }
 
 fn main() {
+    let test_trim = "  \t\r\n adln \n   \n";
+    println!("------------ Test Trim ------------");
+    println!("triml: {:?}", utils::triml(test_trim));
+    println!("trimr: {:?}", utils::trimr(test_trim));
+    println!("trim: {:?}", utils::trim(test_trim));
+    println!("------------ Test PDB Parser ------------");
     parse_pdb();
-    println!("{}", until(&"abcdefg", &[&"j", &"k", &"w"]));
+    println!("------------ Test Until ------------");
+    println!("{:?}", until(&"abcdefg", &[&"j", &"w"]));
+    println!("------------ Test PWord ------------");
+    println!("word {:?}", pword(&"d_7_ te2_243 st test"));
 }

@@ -98,6 +98,17 @@ fn print_aux<'a, 'b>(parser: &Parser<'a, 'b>, indent: Indent) {
             let fskip = format!("skip {}", count);
             print!("{}", fskip);
             let new_ident = indent.push_clone(Indentation::Space(fskip.len()));
+            println!();
+        }
+        ParserType::PWord => {
+            let fpword = "pword";
+            print!("{}", fpword);
+            let new_ident = indent.push_clone(Indentation::Space(fpword.len()));
+        }
+        ParserType::Blank => {
+            let fblank = "blank";
+            print!("{}", fblank);
+            let new_ident = indent.push_clone(Indentation::Space(fblank.len()));
         }
     }
 }

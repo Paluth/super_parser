@@ -6,6 +6,8 @@ pub enum ParserType<'d, 'a> {
     Sequence(Vec<Parser<'d, 'a>>),
     Take(usize),
     Skip(usize),
+    PWord,
+    Blank,
 }
 
 pub struct Parser<'d, 'c> {
@@ -23,7 +25,7 @@ impl<'d, 'c> Parser<'d, 'c> {
         }
     }
 
-    pub fn parse(&mut self, buffer: &'d str) -> Result<(), ParsingError> {
+    pub fn parse(&mut self, buffer: &'d str) -> Result<Option<&'d str>, ParsingError> {
         run_parser(self, buffer)
     }
 
@@ -46,6 +48,14 @@ pub fn skip<'d, 'a>(count: usize) -> Parser<'d, 'a> {
     Parser::new(ParserType::Skip(count))
 }
 
+pub fn pword<'d, 'a>() -> Parser<'d, 'a> {
+    Parser::new(ParserType::PWord)
+}
+
+pub fn blank<'d, 'a>() -> Parser<'d, 'a> {
+    Parser::new(ParserType::Blank)
+}
+
 #[derive(Debug)]
 enum InvalidParserError {
     // Sequence has no parsers
@@ -58,12 +68,18 @@ enum InvalidParserError {
     TakeNot,
     // Not a skip
     SkipNot,
+    // Not a blank
+    BlankNot,
+    // Not a pword
+    PWordNot,
     // Must take mode then zero bytes
     TakeZero,
     // Or must be last in operation chain
     ChainOrLast,
     // Store must be last in operation chain
     ChainStoreLast,
+    // Unexpected error in blank parser
+    BlankError,
 }
 
 #[derive(Debug)]
@@ -78,23 +94,49 @@ enum ParsingError {
     ChainAfterSkip,
     // An error ocorred in the chain
     ChainError(ChainingError),
+    // Buffer is empty
+    EmptyBuffer,
+    // pword is invalid (must start with alpha or '_')
+    InvalidPWord,
+    // An Unexpected Error ocorred, this should not happen
+    UnexpectedError,
 }
 
-fn run_parser<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<(), ParsingError> {
+fn run_parser<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<Option<&'d str>, ParsingError> {
     match parser.ptype {                
-        ParserType::Sequence(_) => return run_seq(parser, buffer),
+        ParserType::Sequence(_) => {
+            let result = run_seq(parser, buffer);
+            match result {
+                Ok(()) => return Ok(None),
+                Err(pe) => return Err(pe),
+            }
+        }
         ParserType::Take(_) => {
             let result = run_take(parser, buffer);
             match result {
-                Err(pe) => Err(pe),
-                Ok(_) => Ok(()),
+                Ok(rest) => return Ok(Some(rest)),
+                Err(pe) => return Err(pe),
             }
         }
         ParserType::Skip(_) => {
             let result = run_skip(parser, buffer);
             match result {
-                Err(pe) => Err(pe),
-                Ok(_) => Ok(()),
+                Ok(rest) => return Ok(Some(rest)),
+                Err(pe) => return Err(pe),
+            }
+        }
+        ParserType::PWord => {
+            let result = run_pword(parser, buffer);
+            match result {
+                Ok(rest) => return Ok(Some(rest)),
+                Err(pe) => return Err(pe),
+            }
+        }
+        ParserType::Blank => {
+            let result = run_blank(parser, buffer);
+            match result {
+                Ok(rest) => return Ok(Some(rest)),
+                Err(pe) => return Err(pe),
             }
         }
     }
@@ -106,28 +148,11 @@ fn run_seq<'d, 'a>(seq_parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<(
             let mut data = buffer;
 
             for parser in list.iter_mut() {
-                match parser.ptype {
-                    ParserType::Sequence(_) => {
-                        let result = run_seq(parser, data);
-
-                        if let Err(_) = result {
-                            return result;
-                        }
-                    }
-                    ParserType::Take(_) => {
-                        let result = run_take(parser, data);
-                        match result {
-                            Ok(rest) => data = rest,
-                            Err(pe) => return Err(pe),
-                        }
-                    }
-                    ParserType::Skip(_) => {
-                        let result = run_skip(parser, data);
-                        match result {
-                            Ok(rest) => data = rest,
-                            Err(pe) => return Err(pe),
-                        }
-                    }
+                let result = run_parser(parser, data);
+                match result {
+                    Err(e) => return Err(e),
+                    Ok(Some(rest)) => data = rest,
+                    Ok(None) => ()
                 }
             }
         }
@@ -136,20 +161,60 @@ fn run_seq<'d, 'a>(seq_parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<(
     Ok(())
 }
 
+fn run_blank<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+    if let ParserType::PWord = parser.ptype {
+        let ut = utils::blank(buffer);
+        match ut {
+            Ok(utils::Split {left, right}) => {
+                parser.parsed = Some(left);
+                let chain_result = run_chain(parser);
+                match chain_result {
+                    Err(ce) => return Err(ParsingError::ChainError(ce)),
+                    Ok(_) => return Ok(right),
+                }
+            }
+            _ => return Err(ParsingError::InvalidParser(InvalidParserError::BlankError)),
+        }
+    }
+    Err(ParsingError::InvalidParser(InvalidParserError::BlankNot))
+}
+
+fn run_pword<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+    if let ParserType::PWord = parser.ptype {
+        let ut = utils::pword(buffer);
+        match ut {
+            Ok(utils::Split {left, right}) => {
+                parser.parsed = Some(left);
+                let chain_result = run_chain(parser);
+                match chain_result {
+                    Err(ce) => return Err(ParsingError::ChainError(ce)),
+                    Ok(_) => return Ok(right),
+                }
+            }
+            Err(utils::Error::EmptyBuffer) => return Err(ParsingError::EmptyBuffer),
+            Err(utils::Error::InvalidPWord) => return Err(ParsingError::InvalidPWord),
+            Err(_) => return Err(ParsingError::UnexpectedError)
+            
+        }
+    }
+    Err(ParsingError::InvalidParser(InvalidParserError::PWordNot))
+}
+
 fn run_skip<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
     if let ParserType::Skip(c) = parser.ptype {
         let ut = utils::skip(buffer, c);
         match ut {
-            utils::Skip::Rest(rest) => {
-                parser.parsed = Some(rest);
+            Ok(utils::Split { left, right }) => {
+                parser.parsed = Some(left);
                 if let Some(_) = parser.chain {
                     return Err(ParsingError::ChainAfterSkip);
                 } else {
-                    return Ok(rest);
+                    return Ok(right);
                 }
             }
-            utils::Skip::InsufficientBuffer => return Err(ParsingError::InsufficientData),
-            utils::Skip::InvalidCharBoundary => return Err(ParsingError::InvalidIndex),
+            Err(utils::Error::InsufficientBuffer) => return Err(ParsingError::InsufficientData),
+            Err(utils::Error::InvalidCharBoundary) => return Err(ParsingError::InvalidIndex),
+            Err(_) => return Err(ParsingError::UnexpectedError)
         }
     }
     Err(ParsingError::InvalidParser(InvalidParserError::SkipNot))
@@ -160,7 +225,7 @@ fn run_take<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d 
     if let ParserType::Take(c) = parser.ptype {
         let ut = utils::take(buffer, c);
         match ut {
-            utils::Take::Split(left, right) => {
+            Ok(utils::Split { left, right }) => {
                 parser.parsed = Some(left);
                 let chain_result = run_chain(parser);
                 match chain_result {
@@ -168,8 +233,9 @@ fn run_take<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d 
                     Ok(_) => return Ok(right),
                 }
             }
-            utils::Take::InsufficientBuffer => return Err(ParsingError::InsufficientData),
-            utils::Take::InvalidCharBoundary => return Err(ParsingError::InvalidIndex),
+            Err(utils::Error::InsufficientBuffer) => return Err(ParsingError::InsufficientData),
+            Err(utils::Error::InvalidCharBoundary) => return Err(ParsingError::InvalidIndex),
+            Err(_) => return Err(ParsingError::UnexpectedError)
         }
     }
     Err(ParsingError::InvalidParser(InvalidParserError::TakeNot))
@@ -201,6 +267,8 @@ enum ChainingError {
     NotImplemented,
     // to_byte can only be used in a length 1 string
     BiggerThenByte,
+    // Unexpected erro while trimming string
+    TrimError,
 }
 
 #[derive(Debug)]
@@ -243,19 +311,40 @@ fn run_operation<'c, 'd>(op: &'c mut Operation,
     match op {
         &mut Operation::Trim => {
             match data {
-                LastChainData::Str(ref s) => Ok(LastChainData::Str(utils::trim(s))),
+                LastChainData::Str(ref s) => {
+                    let result = utils::trim(s);
+                    if let Ok(rest) = result {
+                        Ok(LastChainData::Str(rest))
+                    } else {
+                        Err(ChainingError::TrimError)
+                    }
+                }
                 _ => ParsingDataTypes::Str.chain_type_error(&data),
             }
         } 
         &mut Operation::TrimR => {
             match data {
-                LastChainData::Str(ref s) => Ok(LastChainData::Str(utils::trimr(s))),
+                LastChainData::Str(ref s) => {
+                    let result = utils::trimr(s);
+                    if let Ok(utils::Split {left, ..}) = result {
+                        Ok(LastChainData::Str(left))
+                    } else {
+                        Err(ChainingError::TrimError)
+                    }
+                }
                 _ => ParsingDataTypes::Str.chain_type_error(&data),
             }
         }
         &mut Operation::TrimL => {
             match data {
-                LastChainData::Str(ref s) => Ok(LastChainData::Str(utils::triml(s))),
+                LastChainData::Str(ref s) => {
+                    let result = utils::triml(s);
+                    if let Ok(utils::Split {right, ..}) = result {
+                        Ok(LastChainData::Str(right))
+                    } else {
+                        Err(ChainingError::TrimError)
+                    }
+                }
                 _ => ParsingDataTypes::Str.chain_type_error(&data),
             }
         }

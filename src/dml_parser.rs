@@ -6,14 +6,14 @@ struct DefUse {
 }
 
 impl DefUse {
-    // pub fn parse_def_use(du: &mut DefUse) -> Parser {
-    //     seq([
-    //         word().store(du.name),
-    //         // blank(),
-    //         // tag("{{"),
-    //         // until("}}", ["\}}"]).store(du.data)
-    //     ])
-    // }
+    pub fn parse_def_use(du: &mut DefUse) -> Parser {
+        seq([
+            word().store(du.name),
+            blank(),
+            // tag("{{"),
+            // until("}}", ["\}}"]).store(du.data)
+        ])
+    }
 }
 // fn parse_def() {
 //     let def = 
