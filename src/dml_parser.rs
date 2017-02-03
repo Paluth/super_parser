@@ -1,4 +1,4 @@
-use parser::{Parser, seq, take, skip};
+use parser::{Parser, word, blank, tag};
 
 struct DefUse {
     name: String,
@@ -10,7 +10,7 @@ impl DefUse {
         seq([
             word().store(du.name),
             blank(),
-            //tag("{{"),
+            tag("{{"),
             //until("}}", ["\}}"]).store(du.data)
         ])
     }

@@ -9,12 +9,12 @@ use pdb_parser::ATOM;
 use chain::{trimr, triml, trim, empty, to_i32, to_u8, to_byte, to_f64, opt, store};
 
 fn parse_pdb() {
-    //let line = "ATOM     89  OG  SER A 693      25.623   8.222  86.526  1.00 43.01           O ";
-    //let line = "ATOM      1  N   CYS R   1      52.832  45.826  37.193  1.00  0.00";
-    let line = "ATOM     23  CG1 VAL R   3      58.836  39.331  40.265  1.00  0.00";
-    //let line = "ATOM     90 2HE2 GLN R   7      55.573  32.236  40.457  1.00  0.00";
+    //let test1 = "ATOM     89  OG  SER A 693      25.623   8.222  86.526  1.00 43.01           O ";
+    //let test2 = "ATOM      1  N   CYS R   1      52.832  45.826  37.193  1.00  0.00";
+    //let test3 = "ATOM     90 2HE2 GLN R   7      55.573  32.236  40.457  1.00  0.00";
+    let test4 = "ATOM     23  CG1 VAL R   3      58.836  39.331  40.265  1.00  0.00";
     let mut atom = ATOM::new();
-    atom.parse(&line);    
+    atom.parse(&test4);    
     println!("Serial {}", atom.serial);
     println!("Name {}", atom.name);
     println!("Alt Loc {}", atom.alt_loc);

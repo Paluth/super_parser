@@ -2,23 +2,24 @@ use std::vec::Vec;
 use chain::{Chain, Operation};
 use utils;
 
-pub enum ParserType<'d, 'a> {
+pub enum ParserType<'d, 'a, 't> {
     /// Stores a Sequence of parsers. Executes until all pass or one failure occurs.
-    Sequence(Vec<Parser<'d, 'a>>),
+    Sequence(Vec<Parser<'d, 'a, 't>>),
     Take(usize),
     Skip(usize),
     PWord,
     Blank,
+    Tag(&'t str)
 }
 
-pub struct Parser<'d, 'c> {
-    pub ptype: ParserType<'d, 'c>,
+pub struct Parser<'d, 'c, 't> {
+    pub ptype: ParserType<'d, 'c, 't>,
     pub chain: Option<Chain<'c>>,
     parsed: Option<&'d str>,
 }
 
-impl<'d, 'c> Parser<'d, 'c> {
-    fn new(ptype: ParserType<'d, 'c>) -> Parser<'d, 'c> {
+impl<'d, 'c, 't> Parser<'d, 'c, 't> {
+    fn new(ptype: ParserType<'d, 'c, 't>) -> Parser<'d, 'c, 't> {
         Parser {
             ptype: ptype,
             chain: None,
@@ -37,23 +38,23 @@ impl<'d, 'c> Parser<'d, 'c> {
     }
 }
 
-pub fn seq<'d, 'a>(list_parsers: Vec<Parser<'d, 'a>>) -> Parser<'d, 'a> {
+pub fn seq<'d, 'c, 't>(list_parsers: Vec<Parser<'d, 'c, 't>>) -> Parser<'d, 'c, 't> {
     Parser::new(ParserType::Sequence(list_parsers))
 }
 
-pub fn take<'d, 'a>(count: usize) -> Parser<'d, 'a> {
+pub fn take<'d, 'c, 't>(count: usize) -> Parser<'d, 'c, 't> {
     Parser::new(ParserType::Take(count))
 }
 
-pub fn skip<'d, 'a>(count: usize) -> Parser<'d, 'a> {
+pub fn skip<'d, 'c, 't>(count: usize) -> Parser<'d, 'c, 't> {
     Parser::new(ParserType::Skip(count))
 }
 
-pub fn pword<'d, 'a>() -> Parser<'d, 'a> {
+pub fn pword<'d, 'c, 't>() -> Parser<'d, 'c, 't> {
     Parser::new(ParserType::PWord)
 }
 
-pub fn blank<'d, 'a>() -> Parser<'d, 'a> {
+pub fn blank<'d, 'c, 't>() -> Parser<'d, 'c, 't> {
     Parser::new(ParserType::Blank)
 }
 
@@ -101,9 +102,11 @@ enum ParsingError {
     InvalidPWord,
     // An Unexpected Error ocorred, this should not happen
     UnexpectedError,
+    // Tag is not equal to parsed value
+    TagNotEqual,
 }
 
-fn run_parser<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<Option<&'d str>, ParsingError> {
+fn run_parser<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<Option<&'d str>, ParsingError> {
     match parser.ptype {                
         ParserType::Sequence(_) => {
             let result = run_seq(parser, buffer);
@@ -114,6 +117,13 @@ fn run_parser<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<Op
         }
         ParserType::Take(_) => {
             let result = run_take(parser, buffer);
+            match result {
+                Ok(rest) => return Ok(Some(rest)),
+                Err(pe) => return Err(pe),
+            }
+        }
+        ParserType::Tag(_) => {
+            let result = run_tag(parser, buffer);
             match result {
                 Ok(rest) => return Ok(Some(rest)),
                 Err(pe) => return Err(pe),
@@ -143,7 +153,7 @@ fn run_parser<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<Op
     }
 }
 
-fn run_seq<'d, 'a>(seq_parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<(), ParsingError> {
+fn run_seq<'d, 'c, 't>(seq_parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<(), ParsingError> {
     match seq_parser.ptype {
         ParserType::Sequence(ref mut list) => {
             let mut data = buffer;
@@ -162,7 +172,7 @@ fn run_seq<'d, 'a>(seq_parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<(
     Ok(())
 }
 
-fn run_blank<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+fn run_blank<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<&'d str, ParsingError> {
     if let ParserType::PWord = parser.ptype {
         let ut = utils::blank(buffer);
         match ut {
@@ -180,7 +190,7 @@ fn run_blank<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d
     Err(ParsingError::InvalidParser(InvalidParserError::BlankNot))
 }
 
-fn run_pword<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+fn run_pword<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<&'d str, ParsingError> {
     if let ParserType::PWord = parser.ptype {
         let ut = utils::pword(buffer);
         match ut {
@@ -201,7 +211,7 @@ fn run_pword<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d
     Err(ParsingError::InvalidParser(InvalidParserError::PWordNot))
 }
 
-fn run_skip<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+fn run_skip<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<&'d str, ParsingError> {
     if let ParserType::Skip(c) = parser.ptype {
         let ut = utils::skip(buffer, c);
         match ut {
@@ -221,7 +231,28 @@ fn run_skip<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d 
     Err(ParsingError::InvalidParser(InvalidParserError::SkipNot))
 }
 
-fn run_take<'d, 'a>(parser: &mut Parser<'d, 'a>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+fn run_tag<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<&'d str, ParsingError> {
+    if let ParserType::Tag(value) = parser.ptype {
+        let ut = utils::tag(buffer, value);
+        match ut {
+            Ok(utils::Split { left, right }) => {
+                parser.parsed = Some(left);
+                let chain_result = run_chain(parser);
+                match chain_result {
+                    Err(ce) => return Err(ParsingError::ChainError(ce)),
+                    Ok(_) => return Ok(right),
+                }
+            }
+            Err(utils::Error::TagNotEqual) => return Err(ParsingError::TagNotEqual),
+            Err(utils::Error::InsufficientBuffer) => return Err(ParsingError::InsufficientData),
+            Err(utils::Error::InvalidCharBoundary) => return Err(ParsingError::InvalidIndex),
+            Err(_) => return Err(ParsingError::UnexpectedError)
+        }
+    }
+    Err(ParsingError::InvalidParser(InvalidParserError::TakeNot))
+}
+
+fn run_take<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>, buffer: &'d str) -> Result<&'d str, ParsingError> {
 
     if let ParserType::Take(c) = parser.ptype {
         let ut = utils::take(buffer, c);
@@ -473,7 +504,7 @@ fn run_operation<'c, 'd>(op: &'c mut Operation,
     }
 }
 
-fn run_chain<'d, 'a>(parser: &mut Parser<'d, 'a>) -> Result<(), ChainingError> {
+fn run_chain<'d, 'c, 't>(parser: &mut Parser<'d, 'c, 't>) -> Result<(), ChainingError> {
     if let Some(ref mut chain) = parser.chain {
         if let None = parser.parsed {
             return Err(ChainingError::NoParsedData);

@@ -1,7 +1,7 @@
 use parser::{Parser, ParserType};
 use chain::{Operation, Chain};
 
-pub fn print<'a, 'b>(parser: &Parser<'a, 'b>) {
+pub fn print<'d, 'c, 't>(parser: &Parser<'d, 'c, 't>) {
     print_aux(parser, Indent::new())
 }
 
@@ -72,7 +72,7 @@ impl Indent {
     }
 }
 
-fn print_aux<'a, 'b>(parser: &Parser<'a, 'b>, indent: Indent) {
+fn print_aux<'d, 'c, 't>(parser: &Parser<'d, 'c, 't>, indent: Indent) {
     match parser.ptype {
         ParserType::Sequence(ref list) => {
             print!("seq -|- ");
@@ -98,6 +98,12 @@ fn print_aux<'a, 'b>(parser: &Parser<'a, 'b>, indent: Indent) {
             let fskip = format!("skip {}", count);
             print!("{}", fskip);
             let new_ident = indent.push_clone(Indentation::Space(fskip.len()));
+            println!();
+        }
+         ParserType::Tag(word) => {
+            let ftag = format!("tag {}", word);
+            print!("{}", ftag);
+            let new_ident = indent.push_clone(Indentation::Space(ftag.len()));
             println!();
         }
         ParserType::PWord => {

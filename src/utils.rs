@@ -42,12 +42,7 @@ pub fn take(buffer: &str, count : usize) -> Result<Split, Error> {
 
 #[inline]
 pub fn skip(buffer: &str, count : usize) -> Result<Split, Error> {
-    if buffer.len() < count {
-        return Err(Error::InsufficientBuffer);
-    } else if !buffer.is_char_boundary(count) {
-        return Err(Error::InvalidCharBoundary);
-    }
-    Ok(Split::new(&buffer[..count], &buffer[count..]))
+    take(buffer, count)
 }
 
 // Stolen from NOM
@@ -70,7 +65,7 @@ pub fn is_blank(chr: char) -> bool {
 }
 
 /// Captures characters until a no pword char is found
-/// Note pword starts with A-Z or a-z or '_' and can have A-Z, a-z, '_'
+/// Note pword starts with A-Z or a-z or `_` and can have A-Z, a-z, `_`
 /// and 0-9 after the first char
 pub fn pword<'w>(buffer: &'w str) -> Result<Split, Error> {
     let bytes = buffer.as_bytes();
@@ -101,7 +96,7 @@ pub fn pword<'w>(buffer: &'w str) -> Result<Split, Error> {
 pub fn blank<'a, 'b>(buffer: &'a str) -> Result<Split, Error> {
     triml(buffer)
 }
-/// Takes bytes until the end of the buffer or until an 'ending' is found
+/// Takes bytes until the end of the buffer or until an `ending` is found
 /// Result does not include ending
 pub fn until<'a, 'b>(buffer: &'a str, ending: &[&'b str]) -> Result<Split<'a>, Error> {
     let mut i = 0;
