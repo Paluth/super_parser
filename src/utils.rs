@@ -168,16 +168,16 @@ mod tests {
     #[test]
     fn triml_test() {
         assert_eq!("n͈̰̎u͔n͈̰̎i̙̮͚̦c͚̉o̼̩̰͗d͔̆̓ͥé\n\t   \t\r\r",
-                   triml(TEST_STRING));
+                   triml(TEST_STRING).unwrap().right);
     }
     #[test]
     fn trimr_test() {
         assert_eq!("\t\r \nn͈̰̎u͔n͈̰̎i̙̮͚̦c͚̉o̼̩̰͗d͔̆̓ͥé",
-                   trimr(TEST_STRING));
+                   trimr(TEST_STRING).unwrap().left);
     }
     #[test]
     fn trim_test() {
         assert_eq!("n͈̰̎u͔n͈̰̎i̙̮͚̦c͚̉o̼̩̰͗d͔̆̓ͥé",
-                   trim(TEST_STRING));
+                   trim(TEST_STRING).unwrap());
     }
 }

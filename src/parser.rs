@@ -85,7 +85,7 @@ enum InvalidParserError {
 }
 
 #[derive(Debug)]
-enum ParsingError {
+pub enum ParsingError {
     // Trying to parse with an invalid parser
     InvalidParser(InvalidParserError),
     // More bytes are required then are available
